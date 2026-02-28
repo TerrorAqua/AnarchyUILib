@@ -7,87 +7,11 @@ local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local HttpService = game:GetService("HttpService")
 
--- ============================================
--- PREMIUM KEY SYSTEM
--- ============================================
-local HttpRequest = syn and syn.request or http_request or request or (http and http.request)
-
-if not HttpRequest then
-    warn("[Anarchy UI] Your executor does not support HTTP requests. Premium features disabled.")
-end
-
-local PremiumSystem = {
-    API_URL = "https://anarchyweb-xyz.vercel.app/api/keys",
-    UserKey = nil,
-    IsPremium = false,
-    HWID = game:GetService("RbxAnalyticsService"):GetClientId()
-}
-
-function PremiumSystem:VerifyKey(key)
-    if not HttpRequest then
-        return { success = false, message = "HTTP not supported" }
-    end
-    
-    local url = self.API_URL .. "/verify"
-    
-    local success, response = pcall(function()
-        return HttpRequest({
-            Url = url,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({ 
-                key = key, 
-                hwid = self.HWID 
-            })
-        })
-    end)
-    
-    if success and response and response.StatusCode == 200 then
-        local data = HttpService:JSONDecode(response.Body)
-        if data.success then
-            self.UserKey = key
-            self.IsPremium = true
-        end
-        return data
-    else
-        return { success = false, message = "Connection error" }
-    end
-end
-
-function PremiumSystem:CheckStatus()
-    if not HttpRequest or not self.UserKey then
-        return false
-    end
-    
-    local url = self.API_URL .. "/status"
-    
-    local success, response = pcall(function()
-        return HttpRequest({
-            Url = url,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({ 
-                key = self.UserKey,
-                hwid = self.HWID
-            })
-        })
-    end)
-    
-    if success and response and response.StatusCode == 200 then
-        local data = HttpService:JSONDecode(response.Body)
-        self.IsPremium = data.valid or false
-        return self.IsPremium
-    end
-    
-    return false
-end
-
 -- 1. CUSTOM ICONS
 local Icons = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/Icons/refs/heads/main/sfsymbols/dist/Icons.lua"))()
 
 
 local AnarchyUiLib = {
-    Premium = PremiumSystem,
     Themes = {
 		["Dark"] = {
 			Accent = Color3.fromRGB(0, 151, 230),
@@ -451,103 +375,6 @@ function AnarchyUiLib:Notify(title, description, duration)
 	end)
 end
 
-
--- Premium Key Input
-function AnarchyUiLib:PromptKey(callback)
-	if not HttpRequest then
-		if callback then callback(false) end
-		return
-	end
-	
-	local Theme = self.Themes[self.Settings.CurrentTheme]
-	
-	local Prompt = Util:Create("Frame", {
-        Parent = self._ScreenGui or (RunService:IsStudio() and LocalPlayer.PlayerGui or CoreGui),
-		Size = UDim2.new(0, 400, 0, 200),
-		Position = UDim2.new(0.5, -200, 0.5, -100),
-		BackgroundColor3 = Theme.Background,
-		BorderSizePixel = 0,
-		ZIndex = 1000
-	})
-	Util:Create("UICorner", { CornerRadius = UDim.new(0, 10), Parent = Prompt })
-	Util:Create("UIStroke", { Thickness = 2, Color = Theme.Accent, Parent = Prompt })
-	
-	Util:Create("TextLabel", {
-		Parent = Prompt,
-		Size = UDim2.new(1, -40, 0, 30),
-		Position = UDim2.new(0, 20, 0, 20),
-		BackgroundTransparency = 1,
-		Text = "🔐 Premium Key Required",
-		TextColor3 = Theme.Text,
-		Font = Enum.Font.GothamBold,
-		TextSize = 16,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		ZIndex = 1001
-	})
-	
-	local KeyInput = Util:Create("TextBox", {
-		Parent = Prompt,
-		Size = UDim2.new(1, -40, 0, 40),
-		Position = UDim2.new(0, 20, 0, 70),
-		BackgroundColor3 = Theme.Secondary,
-		Text = "",
-		PlaceholderText = "Enter your key here...",
-		TextColor3 = Theme.Text,
-		PlaceholderColor3 = Theme.TextDim,
-		Font = Enum.Font.Gotham,
-		TextSize = 14,
-		ClearTextOnFocus = false,
-		ZIndex = 1001
-	})
-	Util:Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = KeyInput })
-	
-	local VerifyBtn = Util:Create("TextButton", {
-		Parent = Prompt,
-		Size = UDim2.new(0.45, 0, 0, 35),
-		Position = UDim2.new(0.05, 0, 0, 135),
-		BackgroundColor3 = Theme.Accent,
-		Text = "Verify",
-		TextColor3 = Color3.new(1, 1, 1),
-		Font = Enum.Font.GothamBold,
-		TextSize = 14,
-		ZIndex = 1001
-	})
-	Util:Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = VerifyBtn })
-	
-	local CancelBtn = Util:Create("TextButton", {
-		Parent = Prompt,
-		Size = UDim2.new(0.45, 0, 0, 35),
-		Position = UDim2.new(0.5, 0, 0, 135),
-		BackgroundColor3 = Theme.Secondary,
-		Text = "Cancel",
-		TextColor3 = Theme.Text,
-		Font = Enum.Font.GothamBold,
-		TextSize = 14,
-		ZIndex = 1001
-	})
-	Util:Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = CancelBtn })
-	
-	VerifyBtn.MouseButton1Click:Connect(function()
-		local key = KeyInput.Text
-		if key and key ~= "" then
-			VerifyBtn.Text = "Verifying..."
-			local result = self.Premium:VerifyKey(key)
-			if result.success then
-				self:Notify("Success", "Premium activated!", 3)
-				Prompt:Destroy()
-				if callback then callback(true) end
-			else
-				self:Notify("Error", result.message or "Invalid key", 3)
-				VerifyBtn.Text = "Verify"
-			end
-		end
-	end)
-	
-	CancelBtn.MouseButton1Click:Connect(function()
-		Prompt:Destroy()
-		if callback then callback(false) end
-	end)
-end
 -- [[ WINDOW CREATION ]] --
 
 function AnarchyUiLib:CreateWindow(config)
@@ -568,8 +395,7 @@ function AnarchyUiLib:CreateWindow(config)
 		Parent = (RunService:IsStudio() and LocalPlayer.PlayerGui or CoreGui),
 		ResetOnSpawn = false
 	})
--- в CreateWindow после создания ScreenGui:
-self._ScreenGui = ScreenGui
+	self._ScreenGui = ScreenGui
 
 	local mobileAsset = Util:GetIcon(MobileIcon)
 	if TitleIcon then
@@ -580,7 +406,6 @@ self._ScreenGui = ScreenGui
 	end
 
 	-- MOBILE BUTTON
-	-- MOBILE BUTTON (только на мобильных устройствах)
 	local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	
 	local MobileBtn = Util:Create("ImageButton", {
@@ -603,15 +428,15 @@ self._ScreenGui = ScreenGui
 
 	-- MAIN FRAME
 	local MainFrame = Util:Create("Frame", {
-	Parent = ScreenGui,
-	Size = UDim2.new(0, 0, 0, 0),
-	Position = UDim2.new(0.5, -325, 0.5, -260),
-	BackgroundColor3 = Theme.Background,
-	BackgroundTransparency = Theme.MainTransparency,
-	BorderSizePixel = 0,
-	ClipsDescendants = true,
-	Active = true
-})
+		Parent = ScreenGui,
+		Size = UDim2.new(0, 0, 0, 0),
+		Position = UDim2.new(0.5, -325, 0.5, -260),
+		BackgroundColor3 = Theme.Background,
+		BackgroundTransparency = Theme.MainTransparency,
+		BorderSizePixel = 0,
+		ClipsDescendants = true,
+		Active = true
+	})
 	Util:Create("UICorner", { CornerRadius = UDim.new(0, 10), Parent = MainFrame })
 	Util:Create("UIStroke", { Color = Theme.Border, Thickness = 1.2, Parent = MainFrame })
 
@@ -673,6 +498,7 @@ self._ScreenGui = ScreenGui
 	if BackgroundAssetId then
 		ApplyBackgroundAsset(BackgroundAssetId)
 	end
+
 	local DragBar = Util:Create("Frame", {
 		Parent = MainFrame,
 		Size = UDim2.new(1, -120, 0, 40),
@@ -752,7 +578,6 @@ self._ScreenGui = ScreenGui
 		})
 	end
 
-
 	-- TAB CONTAINER
 	local TabContainer = Util:Create("ScrollingFrame", {
 		Parent = Sidebar,
@@ -807,19 +632,18 @@ self._ScreenGui = ScreenGui
 			btn:SetAttribute("IconRole", "Text")
 		end
 		Util:Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = btn })
-
 		btn.MouseButton1Click:Connect(callback)
 		return btn
 	end
 
 	Util:Tween(MainFrame, 0.6, { Size = UDim2.new(0, 700, 0, 550) })
 
-CreateControlBtn("minus", Theme.Text, function()
-	local isSmall = MainFrame.Size.Y.Offset < 100
-	Util:Tween(MainFrame, 0.5, {
-		Size = isSmall and UDim2.new(0, 700, 0, 550) or UDim2.new(0, 700, 0, 45)
-	})
-end)
+	CreateControlBtn("minus", Theme.Text, function()
+		local isSmall = MainFrame.Size.Y.Offset < 100
+		Util:Tween(MainFrame, 0.5, {
+			Size = isSmall and UDim2.new(0, 700, 0, 550) or UDim2.new(0, 700, 0, 45)
+		})
+	end)
 	CreateControlBtn("xmark", Color3.fromRGB(255, 80, 80), function()
 		Util:Tween(MainFrame, 0.3, { Size = UDim2.new(0,0,0,0) })
 		task.wait(0.2)
@@ -949,62 +773,14 @@ end)
 
 	-- [[ TAB SYSTEM ]] --
 	function Window:CreateTab(config)
-		local name, iconId, mode
+		local name, iconId
 
 		if type(config) == "string" then
 			name = config
 			iconId = nil
-			mode = "freemium"
 		else
 			name = config.Name or "Tab"
 			iconId = config.Icon
-			mode = config.mode or "freemium"
-		end
-		
-		-- Проверка premium доступа
-		if mode == "premium" and not AnarchyUiLib.Premium.IsPremium then
-			-- Создаём заблокированную кнопку
-			local LockedBtn = Util:Create("TextButton", {
-				Parent = TabContainer,
-				Size = UDim2.new(1, 0, 0, 40),
-				BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-				BackgroundTransparency = 0.5,
-				Text = "",
-				AutoButtonColor = false,
-				LayoutOrder = #Tabs + 1
-			})
-			Util:Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = LockedBtn })
-			
-			local lockIcon = Util:Create("ImageLabel", {
-				Parent = LockedBtn,
-				Size = UDim2.new(0, 16, 0, 16),
-				Position = UDim2.new(0, 10, 0.5, -8),
-				BackgroundTransparency = 1,
-				Image = Util:GetIcon("lock.fill"),
-				ImageColor3 = Color3.fromRGB(255, 200, 0)
-			})
-			
-			Util:Create("TextLabel", {
-				Parent = LockedBtn,
-				Size = UDim2.new(1, -36, 1, 0),
-				Position = UDim2.new(0, 36, 0, 0),
-				BackgroundTransparency = 1,
-				Text = name .. " 🔒",
-				TextColor3 = Color3.fromRGB(160, 160, 160),
-				Font = Enum.Font.GothamMedium,
-				TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Left
-			})
-			
-			LockedBtn.MouseButton1Click:Connect(function()
-				AnarchyUiLib:Notify({
-					Title = "Premium Required",
-					Content = "This tab requires a premium key!",
-					Duration = 3
-				})
-			end)
-			
-			return nil -- Возвращаем nil для заблокированного таба
 		end
 
 		local Tab = {}
@@ -1118,50 +894,9 @@ end)
 		-- [[ ELEMENTS ]] --
 
 		-- 1. BUTTON
--- Universal Premium Check Function
-local function CheckPremiumAccess(cfg, customParent, title)
-	local mode = cfg.mode or "freemium"
-	
-	if mode == "premium" and not AnarchyUiLib.Premium.IsPremium then
-		local LockedFrame = Util:Create("Frame", {
-			Parent = customParent,
-			Size = UDim2.new(1, 0, 0, 40),
-			BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-			BackgroundTransparency = 0.5
-		})
-		Util:Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = LockedFrame })
-		
-		Util:Create("ImageLabel", {
-			Parent = LockedFrame,
-			Size = UDim2.new(0, 16, 0, 16),
-			Position = UDim2.new(0, 12, 0.5, -8),
-			BackgroundTransparency = 1,
-			Image = Util:GetIcon("lock.fill"),
-			ImageColor3 = Color3.fromRGB(255, 200, 0)
-		})
-		
-		Util:Create("TextLabel", {
-			Parent = LockedFrame,
-			Size = UDim2.new(1, -40, 1, 0),
-			Position = UDim2.new(0, 36, 0, 0),
-			BackgroundTransparency = 1,
-			Text = title .. " 🔒",
-			TextColor3 = Color3.fromRGB(160, 160, 160),
-			Font = Enum.Font.GothamMedium,
-			TextSize = 14,
-			TextXAlignment = Enum.TextXAlignment.Left
-		})
-		
-		return true -- Заблокировано
-	end
-	
-	return false -- Доступно
-end
 		function Tab:CreateButton(cfg, customParent)
 			customParent = customParent or TabPage
 			local title = cfg.Name or "Button"
-		local mode = cfg.mode or "freemium"
-		if CheckPremiumAccess(cfg, customParent, title) then return nil end
 			local desc = cfg.Description or ""
 			local iconName = cfg.Icon or nil
 			local cb = cfg.Callback or function() end
@@ -1223,12 +958,10 @@ end
 
 			BtnFrame.MouseButton1Click:Connect(function()
 				Util:Tween(BtnFrame, 0.1, { BackgroundColor3 = Theme.Accent })
-
 				if Icon then
 					Util:Tween(Icon, 0.1, { ImageColor3 = Color3.new(1,1,1) })
 				end
 				task.wait(0.15)
-
 				Util:Tween(BtnFrame, 0.3, { BackgroundColor3 = Theme.Secondary })
 				if Icon then
 					Util:Tween(Icon, 0.3, { ImageColor3 = Theme.IconColor })
@@ -1244,41 +977,6 @@ end
 			local desc = cfg.Description or ""
 			local state = cfg.CurrentValue or false
 			local cb = cfg.Callback or function() end
-			local mode = cfg.mode or "freemium"
-			
-			-- Проверка premium
-			if mode == "premium" and not AnarchyUiLib.Premium.IsPremium then
-				local LockedFrame = Util:Create("Frame", {
-					Parent = customParent,
-					Size = UDim2.new(1, 0, 0, 40),
-					BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-					BackgroundTransparency = 0.5
-				})
-				Util:Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = LockedFrame })
-				
-				Util:Create("ImageLabel", {
-					Parent = LockedFrame,
-					Size = UDim2.new(0, 16, 0, 16),
-					Position = UDim2.new(0, 12, 0.5, -8),
-					BackgroundTransparency = 1,
-					Image = Util:GetIcon("lock.fill"),
-					ImageColor3 = Color3.fromRGB(255, 200, 0)
-				})
-				
-				Util:Create("TextLabel", {
-					Parent = LockedFrame,
-					Size = UDim2.new(1, -80, 1, 0),
-					Position = UDim2.new(0, 36, 0, 0),
-					BackgroundTransparency = 1,
-					Text = title .. " 🔒",
-					TextColor3 = Color3.fromRGB(160, 160, 160),
-					Font = Enum.Font.GothamMedium,
-					TextSize = 14,
-					TextXAlignment = Enum.TextXAlignment.Left
-				})
-				
-				return nil
-			end
 
 			local height = desc ~= "" and 55 or 40
 
@@ -1337,7 +1035,6 @@ end
 
 			TogFrame.MouseButton1Click:Connect(function()
 				state = not state
-
 				Util:Tween(SwitchBg, 0.3, { BackgroundColor3 = state and Theme.Accent or Color3.fromRGB(50,50,50) })
 				Util:Tween(Dot, 0.3, { Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9) })
 				cb(state)
@@ -1348,8 +1045,6 @@ end
 		function Tab:CreateSlider(cfg, customParent)
 			customParent = customParent or TabPage
 			local title = cfg.Name or "Slider"
-		local mode = cfg.mode or "freemium"
-		if CheckPremiumAccess(cfg, customParent, title) then return nil end
 			local desc = cfg.Description or ""
 			local iconName = cfg.Icon
 			local min, max = cfg.Range[1], cfg.Range[2]
@@ -1489,8 +1184,6 @@ end
 		function Tab:CreateColorPicker(cfg, customParent)
 			customParent = customParent or TabPage
 			local title = cfg.Name or "Color"
-		local mode = cfg.mode or "freemium"
-		if CheckPremiumAccess(cfg, customParent, title) then return nil end
 			local desc = cfg.Description or ""
 			local default = cfg.Default or Color3.fromRGB(255, 255, 255)
 			local cb = cfg.Callback or function() end
@@ -1735,8 +1428,6 @@ end
 		function Tab:CreateInput(cfg, customParent)
 			customParent = customParent or TabPage
 			local title = cfg.Name or "Input"
-		local mode = cfg.mode or "freemium"
-		if CheckPremiumAccess(cfg, customParent, title) then return nil end
 			local desc = cfg.Description or ""
 			local ph = cfg.Placeholder or "Type here..."
 			local cb = cfg.Callback or function() end
@@ -1880,193 +1571,182 @@ end
 				BorderSizePixel = 0
 			})
 		end
--- 8. COLLAPSIBLE SECTION
-function Tab:CreateCollapsibleSection(cfg, customParent)
-	cfg = cfg or {}
-	customParent = customParent or TabPage
 
-	local title = cfg.Name or "Section"
-	local defaultOpen = cfg.DefaultOpen ~= false
-	local expanded = defaultOpen
+		-- 8. COLLAPSIBLE SECTION
+		function Tab:CreateCollapsibleSection(cfg, customParent)
+			cfg = cfg or {}
+			customParent = customParent or TabPage
 
-	local widthScale, widthOffset = 1, 0
-	local providedSize = cfg.Size or cfg.Width
+			local title = cfg.Name or "Section"
+			local defaultOpen = cfg.DefaultOpen ~= false
+			local expanded = defaultOpen
 
-	if typeof(providedSize) == "UDim2" then
-		widthScale = providedSize.X.Scale
-		widthOffset = providedSize.X.Offset
-	elseif type(providedSize) == "number" then
-		widthScale = providedSize
-	end
+			local widthScale, widthOffset = 1, 0
+			local providedSize = cfg.Size or cfg.Width
 
-	if type(cfg.WidthScale) == "number" then
-		widthScale = cfg.WidthScale
-	end
-	if type(cfg.WidthOffset) == "number" then
-		widthOffset = cfg.WidthOffset
-	end
+			if typeof(providedSize) == "UDim2" then
+				widthScale = providedSize.X.Scale
+				widthOffset = providedSize.X.Offset
+			elseif type(providedSize) == "number" then
+				widthScale = providedSize
+			end
 
-	local function MakeSectionSize(height)
-		return UDim2.new(widthScale, widthOffset, 0, height)
-	end
+			if type(cfg.WidthScale) == "number" then widthScale = cfg.WidthScale end
+			if type(cfg.WidthOffset) == "number" then widthOffset = cfg.WidthOffset end
 
-	local SectionFrame = Util:Create("Frame", {
-		Parent = customParent,
-		Size = MakeSectionSize(40),
-		BackgroundColor3 = Theme.Secondary,
-		ClipsDescendants = true
-	})
-	SectionFrame:SetAttribute("ThemeRole", "Secondary")
-	Util:Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = SectionFrame })
+			local function MakeSectionSize(height)
+				return UDim2.new(widthScale, widthOffset, 0, height)
+			end
 
-	local HeaderBtn = Util:Create("TextButton", {
-		Parent = SectionFrame,
-		Size = UDim2.new(1, 0, 0, 40),
-		BackgroundTransparency = 1,
-		Text = "",
-		AutoButtonColor = false
-	})
+			local SectionFrame = Util:Create("Frame", {
+				Parent = customParent,
+				Size = MakeSectionSize(40),
+				BackgroundColor3 = Theme.Secondary,
+				ClipsDescendants = true
+			})
+			SectionFrame:SetAttribute("ThemeRole", "Secondary")
+			Util:Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = SectionFrame })
 
-	Util:Create("TextLabel", {
-		Parent = HeaderBtn,
-		Text = title,
-		TextColor3 = Theme.Text,
-		Font = Enum.Font.GothamMedium,
-		TextSize = 14,
-		Position = UDim2.new(0, 12, 0, 0),
-		Size = UDim2.new(1, -40, 1, 0),
-		BackgroundTransparency = 1,
-		TextXAlignment = Enum.TextXAlignment.Left
-	})
+			local HeaderBtn = Util:Create("TextButton", {
+				Parent = SectionFrame,
+				Size = UDim2.new(1, 0, 0, 40),
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false
+			})
 
-	local Arrow = Util:Create("ImageLabel", {
-		Parent = HeaderBtn,
-		Size = UDim2.new(0, 16, 0, 16),
-		Position = UDim2.new(1, -28, 0.5, -8),
-		BackgroundTransparency = 1,
-		Image = Util:GetIcon("chevron.down"),
-		ImageColor3 = Theme.IconColor,
-		Rotation = expanded and 180 or 0
-	})
-	Arrow:SetAttribute("IconRole", "Icon")
+			Util:Create("TextLabel", {
+				Parent = HeaderBtn,
+				Text = title,
+				TextColor3 = Theme.Text,
+				Font = Enum.Font.GothamMedium,
+				TextSize = 14,
+				Position = UDim2.new(0, 12, 0, 0),
+				Size = UDim2.new(1, -40, 1, 0),
+				BackgroundTransparency = 1,
+				TextXAlignment = Enum.TextXAlignment.Left
+			})
 
-	local ContentFrame = Util:Create("Frame", {
-		Parent = SectionFrame,
-		Size = UDim2.new(1, -20, 0, 0),
-		Position = UDim2.new(0, 10, 0, 45),
-		BackgroundTransparency = 1
-	})
+			local Arrow = Util:Create("ImageLabel", {
+				Parent = HeaderBtn,
+				Size = UDim2.new(0, 16, 0, 16),
+				Position = UDim2.new(1, -28, 0.5, -8),
+				BackgroundTransparency = 1,
+				Image = Util:GetIcon("chevron.down"),
+				ImageColor3 = Theme.IconColor,
+				Rotation = expanded and 180 or 0
+			})
+			Arrow:SetAttribute("IconRole", "Icon")
 
-	local contentPadding = tonumber(cfg.ContentPadding) or 8
-	local contentDirection = (cfg.ContentDirection == "Horizontal" or cfg.HorizontalContent == true)
-		and Enum.FillDirection.Horizontal
-		or Enum.FillDirection.Vertical
+			local ContentFrame = Util:Create("Frame", {
+				Parent = SectionFrame,
+				Size = UDim2.new(1, -20, 0, 0),
+				Position = UDim2.new(0, 10, 0, 45),
+				BackgroundTransparency = 1
+			})
 
-	local ContentLayout = Util:Create("UIListLayout", {
-		Parent = ContentFrame,
-		Padding = UDim.new(0, contentPadding),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		FillDirection = contentDirection
-	})
+			local contentPadding = tonumber(cfg.ContentPadding) or 8
+			local contentDirection = (cfg.ContentDirection == "Horizontal" or cfg.HorizontalContent == true)
+				and Enum.FillDirection.Horizontal
+				or Enum.FillDirection.Vertical
 
-	local function UpdateHeight()
-		local contentHeight = ContentLayout.AbsoluteContentSize.Y
-		local targetHeight = expanded and (45 + contentHeight) or 40
+			local ContentLayout = Util:Create("UIListLayout", {
+				Parent = ContentFrame,
+				Padding = UDim.new(0, contentPadding),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				FillDirection = contentDirection
+			})
 
-		Util:Tween(SectionFrame, 0.3, { Size = MakeSectionSize(targetHeight) })
-		Util:Tween(ContentFrame, 0.3, { Size = UDim2.new(1, -20, 0, expanded and contentHeight or 0) })
-	end
+			local function UpdateHeight()
+				local contentHeight = ContentLayout.AbsoluteContentSize.Y
+				local targetHeight = expanded and (45 + contentHeight) or 40
+				Util:Tween(SectionFrame, 0.3, { Size = MakeSectionSize(targetHeight) })
+				Util:Tween(ContentFrame, 0.3, { Size = UDim2.new(1, -20, 0, expanded and contentHeight or 0) })
+			end
 
-	HeaderBtn.MouseButton1Click:Connect(function()
-		expanded = not expanded
-		Util:Tween(Arrow, 0.3, { Rotation = expanded and 180 or 0 })
-		UpdateHeight()
-	end)
+			HeaderBtn.MouseButton1Click:Connect(function()
+				expanded = not expanded
+				Util:Tween(Arrow, 0.3, { Rotation = expanded and 180 or 0 })
+				UpdateHeight()
+			end)
 
-	ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		task.defer(UpdateHeight)
-	end)
+			ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+				task.defer(UpdateHeight)
+			end)
 
-	ContentFrame.ChildAdded:Connect(function()
-		task.defer(UpdateHeight)
-	end)
+			ContentFrame.ChildAdded:Connect(function() task.defer(UpdateHeight) end)
+			ContentFrame.ChildRemoved:Connect(function() task.defer(UpdateHeight) end)
 
-	ContentFrame.ChildRemoved:Connect(function()
-		task.defer(UpdateHeight)
-	end)
+			local Section = {}
 
-	local Section = {}
+			Section.SetExpanded = function(_, value)
+				expanded = value and true or false
+				Util:Tween(Arrow, 0.3, { Rotation = expanded and 180 or 0 })
+				UpdateHeight()
+			end
 
-	Section.SetExpanded = function(_, value)
-		expanded = value and true or false
-		Util:Tween(Arrow, 0.3, { Rotation = expanded and 180 or 0 })
-		UpdateHeight()
-	end
+			Section.CreateButton = function(_, c) return Tab.CreateButton(Tab, c, ContentFrame) end
+			Section.CreateToggle = function(_, c) return Tab.CreateToggle(Tab, c, ContentFrame) end
+			Section.CreateSlider = function(_, c) return Tab.CreateSlider(Tab, c, ContentFrame) end
+			Section.CreateColorPicker = function(_, c) return Tab.CreateColorPicker(Tab, c, ContentFrame) end
+			Section.CreateInput = function(_, c) return Tab.CreateInput(Tab, c, ContentFrame) end
+			Section.CreateDropdown = function(_, c) return Tab.CreateDropdown(Tab, c, ContentFrame) end
+			Section.CreateKeybind = function(_, c) return Tab.CreateKeybind(Tab, c, ContentFrame) end
+			Section.CreateToggleWithKeybind = function(_, c) return Tab.CreateToggleWithKeybind(Tab, c, ContentFrame) end
+			Section.CreateParagraph = function(_, c) return Tab.CreateParagraph(Tab, c, ContentFrame) end
+			Section.CreateDivider = function(_, c) return Tab.CreateDivider(Tab, c, ContentFrame) end
 
-	Section.CreateButton = function(_, c) return Tab.CreateButton(Tab, c, ContentFrame) end
-	Section.CreateToggle = function(_, c) return Tab.CreateToggle(Tab, c, ContentFrame) end
-	Section.CreateSlider = function(_, c) return Tab.CreateSlider(Tab, c, ContentFrame) end
-	Section.CreateColorPicker = function(_, c) return Tab.CreateColorPicker(Tab, c, ContentFrame) end
-	Section.CreateInput = function(_, c) return Tab.CreateInput(Tab, c, ContentFrame) end
-	Section.CreateDropdown = function(_, c) return Tab.CreateDropdown(Tab, c, ContentFrame) end
-	Section.CreateKeybind = function(_, c) return Tab.CreateKeybind(Tab, c, ContentFrame) end
-	Section.CreateToggleWithKeybind = function(_, c) return Tab.CreateToggleWithKeybind(Tab, c, ContentFrame) end
-	Section.CreateParagraph = function(_, c) return Tab.CreateParagraph(Tab, c, ContentFrame) end
-	Section.CreateDivider = function(_, c) return Tab.CreateDivider(Tab, c, ContentFrame) end
+			UpdateHeight()
+			return Section
+		end
 
-	UpdateHeight()
-	return Section
-end
+		-- ROW
+		function Tab:CreateRow(cfg, customParent)
+			cfg = cfg or {}
+			customParent = customParent or TabPage
 
--- Добавь в блок методов Tab (рядом с CreateCollapsibleSection)
-function Tab:CreateRow(cfg, customParent)
-	cfg = cfg or {}
-	customParent = customParent or TabPage
+			local columns = math.max(1, math.floor(cfg.Columns or 2))
+			local padding = tonumber(cfg.Padding) or 8
 
-	local columns = math.max(1, math.floor(cfg.Columns or 2))
-	local padding = tonumber(cfg.Padding) or 8
+			local RowFrame = Util:Create("Frame", {
+				Parent = customParent,
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1
+			})
 
-	local RowFrame = Util:Create("Frame", {
-		Parent = customParent,
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1
-	})
+			Util:Create("UIListLayout", {
+				Parent = RowFrame,
+				FillDirection = Enum.FillDirection.Horizontal,
+				Padding = UDim.new(0, padding),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				VerticalAlignment = Enum.VerticalAlignment.Top,
+				HorizontalAlignment = Enum.HorizontalAlignment.Left
+			})
 
-	Util:Create("UIListLayout", {
-		Parent = RowFrame,
-		FillDirection = Enum.FillDirection.Horizontal,
-		Padding = UDim.new(0, padding),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		VerticalAlignment = Enum.VerticalAlignment.Top,
-		HorizontalAlignment = Enum.HorizontalAlignment.Left
-	})
+			local Row = {}
 
-	local Row = {}
+			local function CreateCell()
+				return Util:Create("Frame", {
+					Parent = RowFrame,
+					Size = UDim2.new(1 / columns, -math.floor((padding * (columns - 1)) / columns), 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1
+				})
+			end
 
-	local function CreateCell()
-		return Util:Create("Frame", {
-			Parent = RowFrame,
-			Size = UDim2.new(1 / columns, -math.floor((padding * (columns - 1)) / columns), 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundTransparency = 1
-		})
-	end
+			function Row:CreateCollapsibleSection(sectionCfg)
+				local cell = CreateCell()
+				return Tab.CreateCollapsibleSection(Tab, sectionCfg or {}, cell)
+			end
 
-	function Row:CreateCollapsibleSection(sectionCfg)
-		local cell = CreateCell()
-		return Tab.CreateCollapsibleSection(Tab, sectionCfg or {}, cell)
-	end
+			return Row
+		end
 
-	return Row
-end
-
-		-- 8. DROPDOWN
+		-- 9. DROPDOWN
 		function Tab:CreateDropdown(cfg, customParent)
 			customParent = customParent or TabPage
 			local title = cfg.Name or "Dropdown"
-		local mode = cfg.mode or "freemium"
-		if CheckPremiumAccess(cfg, customParent, title) then return nil end
 			local desc = cfg.Description or ""
 			local options = cfg.Options or {}
 			local current = cfg.CurrentOption or options[1] or ""
@@ -2160,9 +1840,7 @@ end
 			local function SetOption(option, trigger)
 				current = option
 				SelectedLabel.Text = tostring(option)
-				if trigger then
-					cb(option)
-				end
+				if trigger then cb(option) end
 			end
 
 			for _, option in ipairs(options) do
@@ -2201,18 +1879,14 @@ end
 			SetOption(current, false)
 
 			return {
-				Set = function(_, option)
-					SetOption(option, true)
-				end
+				Set = function(_, option) SetOption(option, true) end
 			}
 		end
 
-		-- 9. KEYBIND
+		-- 10. KEYBIND
 		function Tab:CreateKeybind(cfg, customParent)
 			customParent = customParent or TabPage
 			local title = cfg.Name or "Keybind"
-		local mode = cfg.mode or "freemium"
-		if CheckPremiumAccess(cfg, customParent, title) then return nil end
 			local desc = cfg.Description or ""
 			local def = cfg.Default or Enum.KeyCode.E
 			local cb = cfg.Callback or function() end
@@ -2281,433 +1955,414 @@ end
 					listening = false
 					BindBtn.Text = input.KeyCode.Name
 					BindBtn.TextColor3 = Theme.TextDim
-
 					Util:Tween(BindBtn, 0.2, { BackgroundColor3 = Theme.Background })
-
 					cb(input.KeyCode)
 				end
 			end)
 		end
 
-		-- 10. TOGGLE WITH KEYBIND
+		-- 11. TOGGLE WITH KEYBIND
 		function Tab:CreateToggleWithKeybind(cfg, customParent)
-	customParent = customParent or TabPage
-	local title = cfg.Name or "Toggle"
-	local desc = cfg.Description or ""
-	local state = cfg.CurrentValue or false
-	local defaultKey = cfg.Keybind -- nil = None
-	local allowKeybindChange = cfg.AllowKeybindChange ~= false
-	local toggleCb = cfg.Callback or function() end
-	local keybindCb = cfg.KeybindCallback or function() end
+			customParent = customParent or TabPage
+			local title = cfg.Name or "Toggle"
+			local desc = cfg.Description or ""
+			local state = cfg.CurrentValue or false
+			local defaultKey = cfg.Keybind
+			local allowKeybindChange = cfg.AllowKeybindChange ~= false
+			local toggleCb = cfg.Callback or function() end
+			local keybindCb = cfg.KeybindCallback or function() end
 
-	local height = desc ~= "" and 55 or 40
+			local height = desc ~= "" and 55 or 40
 
-	local TogFrame = Util:Create("TextButton", {
-		Parent = customParent,
-		Size = UDim2.new(1, 0, 0, height),
-		BackgroundColor3 = Theme.Secondary,
-		Text = "",
-		AutoButtonColor = false
-	})
-	TogFrame:SetAttribute("ThemeRole", "Secondary")
-	Util:Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = TogFrame })
-
-	Util:Create("TextLabel", {
-		Parent = TogFrame,
-		Text = title,
-		TextColor3 = Theme.Text,
-		Font = Enum.Font.GothamMedium,
-		TextSize = 14,
-		Size = UDim2.new(1, -120, 0, 18),
-		Position = UDim2.new(0, 12, 0, desc ~= "" and 8 or 11),
-		BackgroundTransparency = 1,
-		TextXAlignment = Enum.TextXAlignment.Left
-	})
-
-	if desc ~= "" then
-		Util:Create("TextLabel", {
-			Parent = TogFrame,
-			Size = UDim2.new(1, -120, 0, 14),
-			Position = UDim2.new(0, 12, 0, 28),
-			BackgroundTransparency = 1,
-			Text = desc,
-			TextColor3 = Theme.TextDim,
-			Font = Enum.Font.Gotham,
-			TextSize = 11,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextWrapped = true
-		})
-	end
-
-	local KeybindBtn = Util:Create("TextButton", {
-		Parent = TogFrame,
-		Size = UDim2.new(0, 40, 0, 24),
-		Position = UDim2.new(1, -106, 0.5, -12),
-		BackgroundColor3 = Theme.Background,
-		Text = defaultKey and defaultKey.Name or "None",
-		TextColor3 = Theme.TextDim,
-		Font = Enum.Font.GothamBold,
-		TextSize = 11,
-		AutoButtonColor = allowKeybindChange
-	})
-	KeybindBtn:SetAttribute("ThemeRole", "Background")
-	Util:Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = KeybindBtn })
-	Util:Create("UIStroke", { Color = Theme.Border, Thickness = 1, Parent = KeybindBtn })
-
-	local SwitchBg = Util:Create("TextButton", {
-		Parent = TogFrame,
-		Size = UDim2.new(0, 44, 0, 24),
-		Position = UDim2.new(1, -54, 0.5, -12),
-		BackgroundColor3 = state and Theme.Accent or Color3.fromRGB(50, 50, 50),
-		Text = "",
-		AutoButtonColor = false
-	})
-	Util:Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = SwitchBg })
-
-	local Dot = Util:Create("Frame", {
-		Parent = SwitchBg,
-		Size = UDim2.new(0, 18, 0, 18),
-		Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	})
-	Util:Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = Dot })
-
-	local listening = false
-	local currentKey = defaultKey
-
-	local function applyToggle()
-		state = not state
-		Util:Tween(SwitchBg, 0.3, { BackgroundColor3 = state and Theme.Accent or Color3.fromRGB(50, 50, 50) })
-		Util:Tween(Dot, 0.3, { Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9) })
-		toggleCb(state)
-	end
-
-	TogFrame.MouseButton1Click:Connect(function()
-		if not listening then
-			applyToggle()
-		end
-	end)
-
-	SwitchBg.MouseButton1Click:Connect(function()
-		if not listening then
-			applyToggle()
-		end
-	end)
-
-	KeybindBtn.MouseButton1Click:Connect(function()
-		if not allowKeybindChange then return end
-		listening = true
-		KeybindBtn.Text = "..."
-		KeybindBtn.TextColor3 = Color3.new(1, 1, 1)
-		Util:Tween(KeybindBtn, 0.2, { BackgroundColor3 = Theme.Accent })
-	end)
-
-	UserInputService.InputBegan:Connect(function(input, gpe)
-		if gpe then return end
-
-		if listening and input.UserInputType == Enum.UserInputType.Keyboard then
-			listening = false
-			currentKey = input.KeyCode
-			KeybindBtn.Text = currentKey.Name
-			KeybindBtn.TextColor3 = Theme.TextDim
-			Util:Tween(KeybindBtn, 0.2, { BackgroundColor3 = Theme.Background })
-			keybindCb(currentKey)
-			return
-		end
-
-		if currentKey and input.KeyCode == currentKey and not listening then
-			applyToggle()
-		end
-	end)
-end
-
--- SUBTAB SYSTEM (auto-fit + optional horizontal scroll)
-function Tab:CreateSubtab(config)
-	config = config or {}
-	local name = config.Name or "Subtab"
-	local iconId = config.Icon
-	local Subtab = {}
-
-	-- Init once per Tab
-	if not Tab._SubtabRoot then
-		-- Detach existing content so it doesn't get stacked by old layouts
-		Tab._PreSubtabChildren = {}
-		for _, child in ipairs(TabPage:GetChildren()) do
-			if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
-				table.insert(Tab._PreSubtabChildren, child)
-				child.Parent = nil
-			end
-		end
-
-		-- Remove layout/padding from TabPage: subtab system controls layout now
-		local layout = TabPage:FindFirstChildOfClass("UIListLayout")
-		if layout then layout:Destroy() end
-		local padding = TabPage:FindFirstChildOfClass("UIPadding")
-		if padding then padding:Destroy() end
-
-		-- Disable outer scrolling (each SubtabPage scrolls itself)
-		TabPage.ScrollingEnabled = false
-		TabPage.ScrollBarThickness = 0
-		TabPage.AutomaticCanvasSize = Enum.AutomaticSize.None
-		TabPage.CanvasSize = UDim2.new(0, 0, 0, 0)
-
-		Tab._SubtabRoot = Util:Create("Frame", {
-			Parent = TabPage,
-			Size = UDim2.new(1, 0, 1, 0),
-			BackgroundTransparency = 1,
-			ClipsDescendants = true
-		})
-
-		Tab._SubtabButtons = {}
-		Tab._Subtabs = {}
-		Tab._SelectedSubtab = nil
-
-		-- Horizontal bar (can scroll if too many)
-		Tab._SubtabContainer = Util:Create("ScrollingFrame", {
-			Parent = Tab._SubtabRoot,
-			Size = UDim2.new(1, 0, 0, 35),
-			Position = UDim2.new(0, 0, 0, 0),
-			BackgroundTransparency = 1,
-			CanvasSize = UDim2.new(0, 0, 0, 0),
-			AutomaticCanvasSize = Enum.AutomaticSize.None,
-			ScrollingDirection = Enum.ScrollingDirection.X,
-			ScrollBarThickness = 0,
-			BorderSizePixel = 0,
-			ClipsDescendants = true
-		})
-
-		Tab._SubtabPadding = Util:Create("UIPadding", {
-			Parent = Tab._SubtabContainer,
-			PaddingLeft = UDim.new(0, 6),
-			PaddingRight = UDim.new(0, 6)
-		})
-
-		Tab._SubtabLayout = Util:Create("UIListLayout", {
-			Parent = Tab._SubtabContainer,
-			FillDirection = Enum.FillDirection.Horizontal,
-			Padding = UDim.new(0, 6),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			VerticalAlignment = Enum.VerticalAlignment.Center
-		})
-
-		Tab._SubtabPagesHolder = Util:Create("Frame", {
-			Parent = Tab._SubtabRoot,
-			Size = UDim2.new(1, 0, 1, -40),
-			Position = UDim2.new(0, 0, 0, 40),
-			BackgroundTransparency = 1,
-			ClipsDescendants = true
-		})
-
-		function Tab:_ReflowSubtabs()
-			local n = #Tab._SubtabButtons
-			if n == 0 then return end
-
-			local w = Tab._SubtabContainer.AbsoluteSize.X
-			if w <= 0 then return end
-
-			local padL = (Tab._SubtabPadding and Tab._SubtabPadding.PaddingLeft.Offset) or 0
-			local padR = (Tab._SubtabPadding and Tab._SubtabPadding.PaddingRight.Offset) or 0
-			local spacing = (Tab._SubtabLayout and Tab._SubtabLayout.Padding.Offset) or 0
-
-			local available = w - padL - padR - spacing * (n - 1)
-			local btnW = math.floor(available / n)
-
-			local minW = 90
-			if btnW >= minW then
-				Tab._SubtabContainer.ScrollBarThickness = 0
-				Tab._SubtabContainer.ScrollingEnabled = false
-				Tab._SubtabContainer.AutomaticCanvasSize = Enum.AutomaticSize.None
-				Tab._SubtabContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-				Tab._SubtabContainer.CanvasPosition = Vector2.new(0, 0)
-
-				for _, btn in ipairs(Tab._SubtabButtons) do
-					btn.Size = UDim2.new(0, btnW, 0, 30)
-				end
-			else
-				Tab._SubtabContainer.ScrollingEnabled = true
-				Tab._SubtabContainer.ScrollBarThickness = 2
-				Tab._SubtabContainer.AutomaticCanvasSize = Enum.AutomaticSize.X
-
-				for _, btn in ipairs(Tab._SubtabButtons) do
-					btn.Size = UDim2.new(0, 120, 0, 30)
-				end
-			end
-		end
-
-		Tab._SubtabContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-			task.defer(function()
-				if Tab and Tab._ReflowSubtabs then Tab:_ReflowSubtabs() end
-			end)
-		end)
-
-		Tab._SubtabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-			task.defer(function()
-				if Tab and Tab._ReflowSubtabs then Tab:_ReflowSubtabs() end
-			end)
-		end)
-	end
-
-	local order = #Tab._SubtabButtons + 1
-
-	local SubtabBtn = Util:Create("TextButton", {
-		Parent = Tab._SubtabContainer,
-		Size = UDim2.new(0, 120, 0, 30),
-		BackgroundColor3 = Theme.Secondary,
-		BackgroundTransparency = 0.25, -- меньше “просвета”
-		Text = "",
-		AutoButtonColor = false,
-		LayoutOrder = order
-	})
-	SubtabBtn:SetAttribute("ThemeRole", "Secondary")
-	Util:Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = SubtabBtn })
-
-	local textOffset = 8
-	local IconImg
-	if iconId then
-		local iconAsset = Util:GetIcon(iconId)
-		if iconAsset ~= "" then
-			IconImg = Util:Create("ImageLabel", {
-				Parent = SubtabBtn,
-				Size = UDim2.new(0, 16, 0, 16),
-				Position = UDim2.new(0, 8, 0.5, -8),
-				BackgroundTransparency = 1,
-				Image = iconAsset,
-				ImageColor3 = Theme.IconColor
+			local TogFrame = Util:Create("TextButton", {
+				Parent = customParent,
+				Size = UDim2.new(1, 0, 0, height),
+				BackgroundColor3 = Theme.Secondary,
+				Text = "",
+				AutoButtonColor = false
 			})
-			IconImg:SetAttribute("IconRole", "Icon")
-			textOffset = 28
-		end
-	end
+			TogFrame:SetAttribute("ThemeRole", "Secondary")
+			Util:Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = TogFrame })
 
-	local SubtabLabel = Util:Create("TextLabel", {
-		Parent = SubtabBtn,
-		Size = UDim2.new(1, -(textOffset + 8), 1, 0),
-		Position = UDim2.new(0, textOffset, 0, 0),
-		BackgroundTransparency = 1,
-		Text = name,
-		TextColor3 = Theme.TextDim,
-		Font = Enum.Font.GothamMedium,
-		TextSize = 13,
-		TextXAlignment = Enum.TextXAlignment.Left
-	})
+			Util:Create("TextLabel", {
+				Parent = TogFrame,
+				Text = title,
+				TextColor3 = Theme.Text,
+				Font = Enum.Font.GothamMedium,
+				TextSize = 14,
+				Size = UDim2.new(1, -120, 0, 18),
+				Position = UDim2.new(0, 12, 0, desc ~= "" and 8 or 11),
+				BackgroundTransparency = 1,
+				TextXAlignment = Enum.TextXAlignment.Left
+			})
 
-	local SubtabPage = Util:Create("ScrollingFrame", {
-		Parent = Tab._SubtabPagesHolder,
-		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundTransparency = 1,
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		CanvasSize = UDim2.new(0, 0, 0, 0),
-		ScrollBarThickness = 3,
-		ScrollBarImageColor3 = Theme.Accent,
-		Visible = false,
-		BorderSizePixel = 0
-	})
-	Util:Create("UIListLayout", { Parent = SubtabPage, Padding = UDim.new(0, 8) })
-	Util:Create("UIPadding", {
-		Parent = SubtabPage,
-		PaddingTop = UDim.new(0, 10),
-		PaddingLeft = UDim.new(0, 10),
-		PaddingRight = UDim.new(0, 10),
-		PaddingBottom = UDim.new(0, 10)
-	})
-
-	-- Move old tab content into the first created subtab
-	if Tab._PreSubtabChildren and #Tab._PreSubtabChildren > 0 then
-		for _, child in ipairs(Tab._PreSubtabChildren) do
-			child.Parent = SubtabPage
-		end
-		Tab._PreSubtabChildren = nil
-	end
-
-	local function SelectThis()
-		if Tab._SelectedSubtab then
-			Util:Tween(Tab._SelectedSubtab.Btn, 0.2, { BackgroundTransparency = 0.25 })
-			Tab._SelectedSubtab.Label.TextColor3 = Theme.TextDim
-			Tab._SelectedSubtab.Page.Visible = false
-			if Tab._SelectedSubtab.Icon then
-				Tab._SelectedSubtab.Icon.ImageColor3 = Theme.IconColor
+			if desc ~= "" then
+				Util:Create("TextLabel", {
+					Parent = TogFrame,
+					Size = UDim2.new(1, -120, 0, 14),
+					Position = UDim2.new(0, 12, 0, 28),
+					BackgroundTransparency = 1,
+					Text = desc,
+					TextColor3 = Theme.TextDim,
+					Font = Enum.Font.Gotham,
+					TextSize = 11,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextWrapped = true
+				})
 			end
+
+			local KeybindBtn = Util:Create("TextButton", {
+				Parent = TogFrame,
+				Size = UDim2.new(0, 40, 0, 24),
+				Position = UDim2.new(1, -106, 0.5, -12),
+				BackgroundColor3 = Theme.Background,
+				Text = defaultKey and defaultKey.Name or "None",
+				TextColor3 = Theme.TextDim,
+				Font = Enum.Font.GothamBold,
+				TextSize = 11,
+				AutoButtonColor = allowKeybindChange
+			})
+			KeybindBtn:SetAttribute("ThemeRole", "Background")
+			Util:Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = KeybindBtn })
+			Util:Create("UIStroke", { Color = Theme.Border, Thickness = 1, Parent = KeybindBtn })
+
+			local SwitchBg = Util:Create("TextButton", {
+				Parent = TogFrame,
+				Size = UDim2.new(0, 44, 0, 24),
+				Position = UDim2.new(1, -54, 0.5, -12),
+				BackgroundColor3 = state and Theme.Accent or Color3.fromRGB(50, 50, 50),
+				Text = "",
+				AutoButtonColor = false
+			})
+			Util:Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = SwitchBg })
+
+			local Dot = Util:Create("Frame", {
+				Parent = SwitchBg,
+				Size = UDim2.new(0, 18, 0, 18),
+				Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			})
+			Util:Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = Dot })
+
+			local listening = false
+			local currentKey = defaultKey
+
+			local function applyToggle()
+				state = not state
+				Util:Tween(SwitchBg, 0.3, { BackgroundColor3 = state and Theme.Accent or Color3.fromRGB(50, 50, 50) })
+				Util:Tween(Dot, 0.3, { Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9) })
+				toggleCb(state)
+			end
+
+			TogFrame.MouseButton1Click:Connect(function()
+				if not listening then applyToggle() end
+			end)
+
+			SwitchBg.MouseButton1Click:Connect(function()
+				if not listening then applyToggle() end
+			end)
+
+			KeybindBtn.MouseButton1Click:Connect(function()
+				if not allowKeybindChange then return end
+				listening = true
+				KeybindBtn.Text = "..."
+				KeybindBtn.TextColor3 = Color3.new(1, 1, 1)
+				Util:Tween(KeybindBtn, 0.2, { BackgroundColor3 = Theme.Accent })
+			end)
+
+			UserInputService.InputBegan:Connect(function(input, gpe)
+				if gpe then return end
+
+				if listening and input.UserInputType == Enum.UserInputType.Keyboard then
+					listening = false
+					currentKey = input.KeyCode
+					KeybindBtn.Text = currentKey.Name
+					KeybindBtn.TextColor3 = Theme.TextDim
+					Util:Tween(KeybindBtn, 0.2, { BackgroundColor3 = Theme.Background })
+					keybindCb(currentKey)
+					return
+				end
+
+				if currentKey and input.KeyCode == currentKey and not listening then
+					applyToggle()
+				end
+			end)
 		end
 
-		Tab._SelectedSubtab = { Btn = SubtabBtn, Page = SubtabPage, Label = SubtabLabel, Icon = IconImg }
-		Util:Tween(SubtabBtn, 0.2, { BackgroundTransparency = 0 })
-		SubtabLabel.TextColor3 = Color3.new(1, 1, 1)
-		SubtabPage.Visible = true
-		if IconImg then
-			IconImg.ImageColor3 = Color3.new(1, 1, 1)
+		-- SUBTAB SYSTEM
+		function Tab:CreateSubtab(config)
+			config = config or {}
+			local name = config.Name or "Subtab"
+			local iconId = config.Icon
+			local Subtab = {}
+
+			if not Tab._SubtabRoot then
+				Tab._PreSubtabChildren = {}
+				for _, child in ipairs(TabPage:GetChildren()) do
+					if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+						table.insert(Tab._PreSubtabChildren, child)
+						child.Parent = nil
+					end
+				end
+
+				local layout = TabPage:FindFirstChildOfClass("UIListLayout")
+				if layout then layout:Destroy() end
+				local padding = TabPage:FindFirstChildOfClass("UIPadding")
+				if padding then padding:Destroy() end
+
+				TabPage.ScrollingEnabled = false
+				TabPage.ScrollBarThickness = 0
+				TabPage.AutomaticCanvasSize = Enum.AutomaticSize.None
+				TabPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+				Tab._SubtabRoot = Util:Create("Frame", {
+					Parent = TabPage,
+					Size = UDim2.new(1, 0, 1, 0),
+					BackgroundTransparency = 1,
+					ClipsDescendants = true
+				})
+
+				Tab._SubtabButtons = {}
+				Tab._Subtabs = {}
+				Tab._SelectedSubtab = nil
+
+				Tab._SubtabContainer = Util:Create("ScrollingFrame", {
+					Parent = Tab._SubtabRoot,
+					Size = UDim2.new(1, 0, 0, 35),
+					Position = UDim2.new(0, 0, 0, 0),
+					BackgroundTransparency = 1,
+					CanvasSize = UDim2.new(0, 0, 0, 0),
+					AutomaticCanvasSize = Enum.AutomaticSize.None,
+					ScrollingDirection = Enum.ScrollingDirection.X,
+					ScrollBarThickness = 0,
+					BorderSizePixel = 0,
+					ClipsDescendants = true
+				})
+
+				Tab._SubtabPadding = Util:Create("UIPadding", {
+					Parent = Tab._SubtabContainer,
+					PaddingLeft = UDim.new(0, 6),
+					PaddingRight = UDim.new(0, 6)
+				})
+
+				Tab._SubtabLayout = Util:Create("UIListLayout", {
+					Parent = Tab._SubtabContainer,
+					FillDirection = Enum.FillDirection.Horizontal,
+					Padding = UDim.new(0, 6),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					VerticalAlignment = Enum.VerticalAlignment.Center
+				})
+
+				Tab._SubtabPagesHolder = Util:Create("Frame", {
+					Parent = Tab._SubtabRoot,
+					Size = UDim2.new(1, 0, 1, -40),
+					Position = UDim2.new(0, 0, 0, 40),
+					BackgroundTransparency = 1,
+					ClipsDescendants = true
+				})
+
+				function Tab:_ReflowSubtabs()
+					local n = #Tab._SubtabButtons
+					if n == 0 then return end
+
+					local w = Tab._SubtabContainer.AbsoluteSize.X
+					if w <= 0 then return end
+
+					local padL = (Tab._SubtabPadding and Tab._SubtabPadding.PaddingLeft.Offset) or 0
+					local padR = (Tab._SubtabPadding and Tab._SubtabPadding.PaddingRight.Offset) or 0
+					local spacing = (Tab._SubtabLayout and Tab._SubtabLayout.Padding.Offset) or 0
+
+					local available = w - padL - padR - spacing * (n - 1)
+					local btnW = math.floor(available / n)
+					local minW = 90
+
+					if btnW >= minW then
+						Tab._SubtabContainer.ScrollBarThickness = 0
+						Tab._SubtabContainer.ScrollingEnabled = false
+						Tab._SubtabContainer.AutomaticCanvasSize = Enum.AutomaticSize.None
+						Tab._SubtabContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+						Tab._SubtabContainer.CanvasPosition = Vector2.new(0, 0)
+						for _, btn in ipairs(Tab._SubtabButtons) do
+							btn.Size = UDim2.new(0, btnW, 0, 30)
+						end
+					else
+						Tab._SubtabContainer.ScrollingEnabled = true
+						Tab._SubtabContainer.ScrollBarThickness = 2
+						Tab._SubtabContainer.AutomaticCanvasSize = Enum.AutomaticSize.X
+						for _, btn in ipairs(Tab._SubtabButtons) do
+							btn.Size = UDim2.new(0, 120, 0, 30)
+						end
+					end
+				end
+
+				Tab._SubtabContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+					task.defer(function()
+						if Tab and Tab._ReflowSubtabs then Tab:_ReflowSubtabs() end
+					end)
+				end)
+
+				Tab._SubtabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+					task.defer(function()
+						if Tab and Tab._ReflowSubtabs then Tab:_ReflowSubtabs() end
+					end)
+				end)
+			end
+
+			local order = #Tab._SubtabButtons + 1
+
+			local SubtabBtn = Util:Create("TextButton", {
+				Parent = Tab._SubtabContainer,
+				Size = UDim2.new(0, 120, 0, 30),
+				BackgroundColor3 = Theme.Secondary,
+				BackgroundTransparency = 0.25,
+				Text = "",
+				AutoButtonColor = false,
+				LayoutOrder = order
+			})
+			SubtabBtn:SetAttribute("ThemeRole", "Secondary")
+			Util:Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = SubtabBtn })
+
+			local textOffset = 8
+			local IconImg
+			if iconId then
+				local iconAsset = Util:GetIcon(iconId)
+				if iconAsset ~= "" then
+					IconImg = Util:Create("ImageLabel", {
+						Parent = SubtabBtn,
+						Size = UDim2.new(0, 16, 0, 16),
+						Position = UDim2.new(0, 8, 0.5, -8),
+						BackgroundTransparency = 1,
+						Image = iconAsset,
+						ImageColor3 = Theme.IconColor
+					})
+					IconImg:SetAttribute("IconRole", "Icon")
+					textOffset = 28
+				end
+			end
+
+			local SubtabLabel = Util:Create("TextLabel", {
+				Parent = SubtabBtn,
+				Size = UDim2.new(1, -(textOffset + 8), 1, 0),
+				Position = UDim2.new(0, textOffset, 0, 0),
+				BackgroundTransparency = 1,
+				Text = name,
+				TextColor3 = Theme.TextDim,
+				Font = Enum.Font.GothamMedium,
+				TextSize = 13,
+				TextXAlignment = Enum.TextXAlignment.Left
+			})
+
+			local SubtabPage = Util:Create("ScrollingFrame", {
+				Parent = Tab._SubtabPagesHolder,
+				Size = UDim2.new(1, 0, 1, 0),
+				BackgroundTransparency = 1,
+				AutomaticCanvasSize = Enum.AutomaticSize.Y,
+				CanvasSize = UDim2.new(0, 0, 0, 0),
+				ScrollBarThickness = 3,
+				ScrollBarImageColor3 = Theme.Accent,
+				Visible = false,
+				BorderSizePixel = 0
+			})
+			Util:Create("UIListLayout", { Parent = SubtabPage, Padding = UDim.new(0, 8) })
+			Util:Create("UIPadding", {
+				Parent = SubtabPage,
+				PaddingTop = UDim.new(0, 10),
+				PaddingLeft = UDim.new(0, 10),
+				PaddingRight = UDim.new(0, 10),
+				PaddingBottom = UDim.new(0, 10)
+			})
+
+			if Tab._PreSubtabChildren and #Tab._PreSubtabChildren > 0 then
+				for _, child in ipairs(Tab._PreSubtabChildren) do
+					child.Parent = SubtabPage
+				end
+				Tab._PreSubtabChildren = nil
+			end
+
+			local function SelectThis()
+				if Tab._SelectedSubtab then
+					Util:Tween(Tab._SelectedSubtab.Btn, 0.2, { BackgroundTransparency = 0.25 })
+					Tab._SelectedSubtab.Label.TextColor3 = Theme.TextDim
+					Tab._SelectedSubtab.Page.Visible = false
+					if Tab._SelectedSubtab.Icon then
+						Tab._SelectedSubtab.Icon.ImageColor3 = Theme.IconColor
+					end
+				end
+
+				Tab._SelectedSubtab = { Btn = SubtabBtn, Page = SubtabPage, Label = SubtabLabel, Icon = IconImg }
+				Util:Tween(SubtabBtn, 0.2, { BackgroundTransparency = 0 })
+				SubtabLabel.TextColor3 = Color3.new(1, 1, 1)
+				SubtabPage.Visible = true
+				if IconImg then IconImg.ImageColor3 = Color3.new(1, 1, 1) end
+			end
+
+			SubtabBtn.MouseButton1Click:Connect(SelectThis)
+
+			table.insert(Tab._SubtabButtons, SubtabBtn)
+			table.insert(Tab._Subtabs, Subtab)
+
+			task.defer(function()
+				if Tab and Tab._ReflowSubtabs then Tab:_ReflowSubtabs() end
+			end)
+
+			if not Tab._SelectedSubtab then SelectThis() end
+
+			Subtab.CreateButton = function(_, cfg) return Tab.CreateButton(Tab, cfg, SubtabPage) end
+			Subtab.CreateToggle = function(_, cfg) return Tab.CreateToggle(Tab, cfg, SubtabPage) end
+			Subtab.CreateSlider = function(_, cfg) return Tab.CreateSlider(Tab, cfg, SubtabPage) end
+			Subtab.CreateColorPicker = function(_, cfg) return Tab.CreateColorPicker(Tab, cfg, SubtabPage) end
+			Subtab.CreateInput = function(_, cfg) return Tab.CreateInput(Tab, cfg, SubtabPage) end
+			Subtab.CreateParagraph = function(_, cfg) return Tab.CreateParagraph(Tab, cfg, SubtabPage) end
+			Subtab.CreateDivider = function(_, cfg) return Tab.CreateDivider(Tab, cfg, SubtabPage) end
+			Subtab.CreateDropdown = function(_, cfg) return Tab.CreateDropdown(Tab, cfg, SubtabPage) end
+			Subtab.CreateKeybind = function(_, cfg) return Tab.CreateKeybind(Tab, cfg, SubtabPage) end
+			Subtab.CreateToggleWithKeybind = function(_, cfg) return Tab.CreateToggleWithKeybind(Tab, cfg, SubtabPage) end
+			Subtab.CreateCollapsibleSection = function(_, cfg) return Tab.CreateCollapsibleSection(Tab, cfg, SubtabPage) end
+			Subtab.CreateRow = function(_, cfg)
+				cfg = cfg or {}
+				local columns = math.max(1, math.floor(cfg.Columns or 2))
+				local padding = tonumber(cfg.Padding) or 8
+
+				local RowFrame = Util:Create("Frame", {
+					Parent = SubtabPage,
+					Size = UDim2.new(1, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1
+				})
+
+				Util:Create("UIListLayout", {
+					Parent = RowFrame,
+					FillDirection = Enum.FillDirection.Horizontal,
+					Padding = UDim.new(0, padding),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					VerticalAlignment = Enum.VerticalAlignment.Top,
+					HorizontalAlignment = Enum.HorizontalAlignment.Left
+				})
+
+				local Row = {}
+
+				local function CreateCell()
+					return Util:Create("Frame", {
+						Parent = RowFrame,
+						Size = UDim2.new(1 / columns, -math.floor((padding * (columns - 1)) / columns), 0, 0),
+						AutomaticSize = Enum.AutomaticSize.Y,
+						BackgroundTransparency = 1
+					})
+				end
+
+				function Row:CreateCollapsibleSection(sectionCfg)
+					local cell = CreateCell()
+					return Tab.CreateCollapsibleSection(Tab, sectionCfg or {}, cell)
+				end
+
+				return Row
+			end
+
+			return Subtab
 		end
+
+		return Tab
 	end
-
-	SubtabBtn.MouseButton1Click:Connect(SelectThis)
-
-	table.insert(Tab._SubtabButtons, SubtabBtn)
-	table.insert(Tab._Subtabs, Subtab)
-
-	task.defer(function()
-		if Tab and Tab._ReflowSubtabs then Tab:_ReflowSubtabs() end
-	end)
-
-	if not Tab._SelectedSubtab then
-		SelectThis()
-	end
-
-	Subtab.CreateButton = function(_, cfg) return Tab.CreateButton(Tab, cfg, SubtabPage) end
-	Subtab.CreateToggle = function(_, cfg) return Tab.CreateToggle(Tab, cfg, SubtabPage) end
-	Subtab.CreateSlider = function(_, cfg) return Tab.CreateSlider(Tab, cfg, SubtabPage) end
-	Subtab.CreateColorPicker = function(_, cfg) return Tab.CreateColorPicker(Tab, cfg, SubtabPage) end
-	Subtab.CreateInput = function(_, cfg) return Tab.CreateInput(Tab, cfg, SubtabPage) end
-	Subtab.CreateParagraph = function(_, cfg) return Tab.CreateParagraph(Tab, cfg, SubtabPage) end
-	Subtab.CreateDivider = function(_, cfg) return Tab.CreateDivider(Tab, cfg, SubtabPage) end
-	Subtab.CreateDropdown = function(_, cfg) return Tab.CreateDropdown(Tab, cfg, SubtabPage) end
-	Subtab.CreateKeybind = function(_, cfg) return Tab.CreateKeybind(Tab, cfg, SubtabPage) end
-	Subtab.CreateToggleWithKeybind = function(_, cfg) return Tab.CreateToggleWithKeybind(Tab, cfg, SubtabPage) end
-	Subtab.CreateCollapsibleSection = function(_, cfg) return Tab.CreateCollapsibleSection(Tab, cfg, SubtabPage) end
-    Subtab.CreateRow = function(_, cfg)
-    cfg = cfg or {}
-    local columns = math.max(1, math.floor(cfg.Columns or 2))
-    local padding = tonumber(cfg.Padding) or 8
-
-    local RowFrame = Util:Create("Frame", {
-        Parent = SubtabPage,
-        Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundTransparency = 1
-    })
-
-    Util:Create("UIListLayout", {
-        Parent = RowFrame,
-        FillDirection = Enum.FillDirection.Horizontal,
-        Padding = UDim.new(0, padding),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        VerticalAlignment = Enum.VerticalAlignment.Top,
-        HorizontalAlignment = Enum.HorizontalAlignment.Left
-    })
-
-    local Row = {}
-
-    local function CreateCell()
-        return Util:Create("Frame", {
-            Parent = RowFrame,
-            Size = UDim2.new(1 / columns, -math.floor((padding * (columns - 1)) / columns), 0, 0),
-            AutomaticSize = Enum.AutomaticSize.Y,
-            BackgroundTransparency = 1
-        })
-    end
-
-    function Row:CreateCollapsibleSection(sectionCfg)
-        local cell = CreateCell()
-        return Tab.CreateCollapsibleSection(Tab, sectionCfg or {}, cell)
-    end
-
-    return Row
-end
-
-   return Subtab
-end
-
-    return Tab
-end
-
 
 	-- [[ UI SETTINGS TAB ]] --
 	if ShowSettingsTab then
@@ -2735,11 +2390,7 @@ end
 				end
 			})
 
-			-- SUBTAB 1: THEMES
-			local ThemesSubtab = SettingsTab:CreateSubtab({
-				Name = "Themes",
-				Icon = "paintpalette"
-			})
+			local ThemesSubtab = SettingsTab:CreateSubtab({ Name = "Themes", Icon = "paintpalette" })
 
 			local themeOptions = {}
 			for themeName in pairs(AnarchyUiLib.Themes) do
@@ -2759,11 +2410,7 @@ end
 				end
 			})
 
-			-- SUBTAB 2: APPEARANCE
-			local AppearanceSubtab = SettingsTab:CreateSubtab({
-				Name = "Appearance",
-				Icon = "eye"
-			})
+			local AppearanceSubtab = SettingsTab:CreateSubtab({ Name = "Appearance", Icon = "eye" })
 
 			AppearanceSubtab:CreateSlider({
 				Name = "Main Transparency",
@@ -2789,11 +2436,7 @@ end
 				end
 			})
 
-			-- SUBTAB 3: COLORS
-			local ColorsSubtab = SettingsTab:CreateSubtab({
-				Name = "Colors",
-				Icon = "paintbrush"
-			})
+			local ColorsSubtab = SettingsTab:CreateSubtab({ Name = "Colors", Icon = "paintbrush" })
 
 			ColorsSubtab:CreateColorPicker({
 				Name = "Accent Color",
@@ -2817,9 +2460,7 @@ end
 				Name = "Icon Color",
 				Description = "Change icons color",
 				Default = Theme.IconColor,
-				Callback = function(color)
-					Theme.IconColor = color
-				end
+				Callback = function(color) Theme.IconColor = color end
 			})
 
 			ColorsSubtab:CreateColorPicker({
@@ -2896,11 +2537,7 @@ end
 				end
 			})
 
-			-- SUBTAB 4: KEYBINDS
-			local KeybindsSubtab = SettingsTab:CreateSubtab({
-				Name = "Keybinds",
-				Icon = "keyboard"
-			})
+			local KeybindsSubtab = SettingsTab:CreateSubtab({ Name = "Keybinds", Icon = "keyboard" })
 
 			KeybindsSubtab:CreateKeybind({
 				Name = "Toggle UI Keybind",
@@ -2911,8 +2548,6 @@ end
 					AnarchyUiLib:Notify("Keybind Changed", "New toggle key: " .. key.Name, 3)
 				end
 			})
-
-			SettingsTabRef = SettingsTab
 		end)
 	end
 
